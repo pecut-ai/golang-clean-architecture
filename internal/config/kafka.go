@@ -12,15 +12,15 @@ func NewKafkaConsumerGroup(config *viper.Viper, log *logrus.Logger) sarama.Consu
 	saramaConfig := sarama.NewConfig()
 	saramaConfig.Consumer.Return.Errors = true
 
-	offsetReset := config.GetString("kafka.auto.offset.reset")
+	offsetReset := config.GetString("KAFKA_AUTO_OFFSET_RESET")
 	if offsetReset == "earliest" {
 		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
 	} else {
 		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
 	}
 
-	brokers := strings.Split(config.GetString("kafka.bootstrap.servers"), ",")
-	groupID := config.GetString("kafka.group.id")
+	brokers := strings.Split(config.GetString("KAFKA_BOOTSTRAP_SERVER"), ",")
+	groupID := config.GetString("KAFKA_GROUP_ID")
 
 	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, saramaConfig)
 	if err != nil {
@@ -30,7 +30,7 @@ func NewKafkaConsumerGroup(config *viper.Viper, log *logrus.Logger) sarama.Consu
 }
 
 func NewKafkaProducer(config *viper.Viper, log *logrus.Logger) sarama.SyncProducer {
-	if !config.GetBool("kafka.producer.enabled") {
+	if !config.GetBool("KAFKA_PRODUCER_ENABLED") {
 		log.Info("Kafka producer is disabled")
 		return nil
 	}
@@ -40,7 +40,7 @@ func NewKafkaProducer(config *viper.Viper, log *logrus.Logger) sarama.SyncProduc
 	saramaConfig.Producer.RequiredAcks = sarama.WaitForAll
 	saramaConfig.Producer.Retry.Max = 3
 
-	brokers := strings.Split(config.GetString("kafka.bootstrap.servers"), ",")
+	brokers := strings.Split(config.GetString("KAFKA_BOOTSTRAP_SERVER"), ",")
 
 	producer, err := sarama.NewSyncProducer(brokers, saramaConfig)
 	if err != nil {

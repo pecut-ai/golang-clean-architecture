@@ -9,9 +9,9 @@ help:
 	@echo "  make docker-restart - Restart Docker containers"
 	@echo "  make migrate-up     - Run database migrations"
 	@echo "  make migrate-down   - Rollback database migrations"
-	@echo "  make run-api        - Run API server"
+	@echo "  make run-web        - Run WEB server"
 	@echo "  make run-worker     - Run Worker"
-	@echo "  make run            - Run both API and Worker"
+	@echo "  make run            - Start containers, migrate, and run WEB + Worker"
 	@echo "  make clean          - Clean build artifacts and stop containers"
 
 install:
@@ -21,7 +21,7 @@ install:
 
 build:
 	@echo "Building binaries..."
-	go build -o bin/api cmd/api/main.go
+	go build -o bin/web cmd/web/main.go
 	go build -o bin/worker cmd/worker/main.go
 
 docker-up:
@@ -48,9 +48,9 @@ migrate-down:
 		-path=/migrations/ \
 		-database "postgresql://postgres:123@localhost:5432/golang_clean_architecture?sslmode=disable" down
 
-run-api:
-	@echo "Running API server..."
-	go run cmd/api/main.go
+run-web:
+	@echo "Running WEB server..."
+	go run cmd/web/main.go
 
 run-worker:
 	@echo "Running Worker..."
@@ -63,7 +63,7 @@ run:
 	@sleep 5
 	@make migrate-up
 	@echo "Starting API and Worker..."
-	@make -j2 run-api run-worker
+	@make -j2 run-web run-worker
 
 clean:
 	@echo "Cleaning up..."
