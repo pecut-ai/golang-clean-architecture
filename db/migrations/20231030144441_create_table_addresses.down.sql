@@ -1,1 +1,1 @@
-drop table addresses;
+DROP TABLE IF EXISTS addresses CASCADE;

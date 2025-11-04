@@ -17,13 +17,13 @@ This is golang clean architecture template.
 7. The Repository perform database operation to the database
 8. The Use Case create various Model for Gateway or from Entity data
 9. The Use Case calls Gateway, and execute it using Model data
-10. The Gateway using Model data to construct request to external system 
+10. The Gateway using Model data to construct request to external system
 11. The Gateway perform request to external system (HTTP, gRPC, Messaging, etc)
 
 ## Tech Stack
 
 - Golang : https://github.com/golang/go
-- MySQL (Database) : https://github.com/mysql/mysql-server
+- Postgres (Database)
 - Apache Kafka : https://github.com/apache/kafka
 
 ## Framework & Library
