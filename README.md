@@ -38,26 +38,95 @@ This is golang clean architecture template.
 
 ## Configuration
 
-All configuration is in `config.json` file.
+All configuration is in `.env` file. Copy and modify as needed:
+
+```bash
+# Application
+APP_NAME=golang-clean-architecture
+WEB_PORT=3000
+WEB_PREFORK=false
+LOG_LEVEL=4
+
+# Database
+DB_USERNAME=postgres
+DB_PASSWORD=123
+DB_HOST=localhost
+DB_POST=5432
+DB_NAME=golang_clean_architecture
+DB_POOL_IDLE=10
+DB_POOL_MAX=100
+DB_POOL_LIFETIME=300
+
+# Kafka
+KAFKA_PRODUCER_ENABLED=false
+KAFKA_BOOTSTRAP_SERVER=localhost:9092
+KAFKA_GROUP_ID=golang-clean-arch-group
+KAFKA_AUTO_OFFSET_RESET=earliest
+```
 
 ## API Spec
 
 All API Spec is in `api` folder.
 
+## Quick Start
+
+### Prerequisites
+
+- Go 1.25+
+- Docker & Docker Compose
+- Make
+
+### Setup and Run
+
+```bash
+# Install dependencies
+make install
+
+# Start everything (containers + migrations + app)
+make run
+```
+
+This will:
+
+1. Start Docker containers (Postgres & Kafka)
+2. Run database migrations
+3. Start both web server and worker
+
+### Available Make Commands
+
+```bash
+make help              # Show all available commands
+make install           # Install Go dependencies
+make build             # Build binaries
+make docker-up         # Start Docker containers
+make docker-down       # Stop Docker containers
+make docker-restart    # Restart Docker containers
+make migrate-up        # Run database migrations
+make migrate-down      # Rollback database migrations
+make run-web           # Run web server only
+make run-worker        # Run worker only
+make run               # Start containers, migrate, and run everything
+make clean             # Clean build artifacts and stop containers
+```
+
 ## Database Migration
 
-All database migration is in `db/migrations` folder.
+All database migration files are in `db/migrations` folder.
 
 ### Create Migration
 
-```shell
+```bash
 migrate create -ext sql -dir db/migrations create_table_xxx
 ```
 
-### Run Migration
+### Manual Migration
 
-```shell
-migrate -database "mysql://root:@tcp(localhost:3306)/golang_clean_architecture?charset=utf8mb4&parseTime=True&loc=Local" -path db/migrations up
+```bash
+# Up
+make migrate-up
+
+# Down
+make migrate-down
 ```
 
 ## Run Application
@@ -68,14 +137,20 @@ migrate -database "mysql://root:@tcp(localhost:3306)/golang_clean_architecture?c
 go test -v ./test/
 ```
 
-### Run web server
+### Run web server only
 
 ```bash
-go run cmd/web/main.go
+make run-web
 ```
 
-### Run worker
+### Run worker only
 
 ```bash
-go run cmd/worker/main.go
+make run-worker
+```
+
+### Run everything
+
+```bash
+make run
 ```
