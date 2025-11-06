@@ -21,14 +21,6 @@ type RouteConfig struct {
 func (c *RouteConfig) Setup() {
 	c.SetupGuestRoute()
 	c.SetupAuthRoute()
-	RegisterHumaOperations(c)
-}
-
-// RegisterHumaOperations registers all Huma operations for OpenAPI generation
-// This can be called independently for generating OpenAPI specs
-func RegisterHumaOperations(c *RouteConfig) {
-	registerGuestHumaOperations(c)
-	registerAuthHumaOperations(c)
 }
 
 func (c *RouteConfig) SetupGuestRoute() {
@@ -71,9 +63,14 @@ func (c *RouteConfig) SetupAuthRoute() {
 	}
 }
 
+func RegisterHumaOperations(api huma.API) {
+	registerGuestHumaOperations(api)
+	registerAuthHumaOperations(api)
+}
+
 // registerGuestHumaOperations registers Huma operations for public routes
-func registerGuestHumaOperations(c *RouteConfig) {
-	huma.Register(c.Api, huma.Operation{
+func registerGuestHumaOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
 		OperationID: "register-user",
 		Method:      "POST",
 		Path:        "/api/users",
@@ -88,7 +85,7 @@ func registerGuestHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "login-user",
 		Method:      "POST",
 		Path:        "/api/users/_login",
@@ -105,9 +102,9 @@ func registerGuestHumaOperations(c *RouteConfig) {
 }
 
 // registerAuthHumaOperations registers Huma operations for authenticated routes
-func registerAuthHumaOperations(c *RouteConfig) {
+func registerAuthHumaOperations(api huma.API) {
 	// User operations
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "logout-user",
 		Method:      "DELETE",
 		Path:        "/api/users",
@@ -119,7 +116,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "update-current-user",
 		Method:      "PATCH",
 		Path:        "/api/users/_current",
@@ -135,7 +132,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "get-current-user",
 		Method:      "GET",
 		Path:        "/api/users/_current",
@@ -150,7 +147,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 	})
 
 	// Contact operations
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "list-contacts",
 		Method:      "GET",
 		Path:        "/api/contacts",
@@ -170,7 +167,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "create-contact",
 		Method:      "POST",
 		Path:        "/api/contacts",
@@ -186,7 +183,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "update-contact",
 		Method:      "PUT",
 		Path:        "/api/contacts/{contactId}",
@@ -203,7 +200,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "get-contact",
 		Method:      "GET",
 		Path:        "/api/contacts/{contactId}",
@@ -219,7 +216,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "delete-contact",
 		Method:      "DELETE",
 		Path:        "/api/contacts/{contactId}",
@@ -234,7 +231,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 	})
 
 	// Address operations
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "list-addresses",
 		Method:      "GET",
 		Path:        "/api/contacts/{contactId}/addresses",
@@ -250,7 +247,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "create-address",
 		Method:      "POST",
 		Path:        "/api/contacts/{contactId}/addresses",
@@ -267,7 +264,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "update-address",
 		Method:      "PUT",
 		Path:        "/api/contacts/{contactId}/addresses/{addressId}",
@@ -285,7 +282,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "get-address",
 		Method:      "GET",
 		Path:        "/api/contacts/{contactId}/addresses/{addressId}",
@@ -302,7 +299,7 @@ func registerAuthHumaOperations(c *RouteConfig) {
 		return nil, nil
 	})
 
-	huma.Register(c.Api, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "delete-address",
 		Method:      "DELETE",
 		Path:        "/api/contacts/{contactId}/addresses/{addressId}",

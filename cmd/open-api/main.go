@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"golang-clean-architecture/internal/config"
 	"golang-clean-architecture/internal/delivery/http/route"
 	"log"
 	"os"
@@ -13,41 +15,31 @@ import (
 )
 
 func main() {
+	config := config.NewViper()
+
 	// Create a minimal Fiber app (won't be started)
 	app := fiber.New()
+	appName := config.GetString("APP_NAME")
+	webPort := config.GetString("WEB_PORT")
 
 	// Create Huma API with the same config as the main app
-	humaConfig := huma.DefaultConfig("Backend API", "1.0.0")
+	humaConfig := huma.DefaultConfig(appName, "1.0.0")
 	humaConfig.Servers = []*huma.Server{
-		{URL: "http://localhost:8080", Description: "Development server"},
-		{URL: "https://api.example.com", Description: "Production server"},
+		{URL: fmt.Sprintf("http://localhost:%s", webPort), Description: "Development server"},
 	}
 
-	// Add security scheme for bearer token
+	// Add security scheme for basic auth
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		"bearer": {
-			Type:         "http",
-			Scheme:       "bearer",
-			BearerFormat: "JWT",
-			Description:  "Bearer token authentication",
+		"basic": {
+			Type:        "http",
+			Scheme:      "basic",
+			Description: "Basic authentication",
 		},
 	}
 
 	api := humafiber.New(app, humaConfig)
 
-	// Register all routes using the shared route configuration
-	// We only need the API for OpenAPI generation, so we pass nil for controllers
-	routeConfig := route.RouteConfig{
-		App:               app,
-		Api:               api,
-		UserController:    nil,
-		ContactController: nil,
-		AddressController: nil,
-		AuthMiddleware:    nil,
-	}
-
-	// Register only the Huma operations (skip Fiber routes since we're not running the server)
-	registerOpenAPIRoutes(&routeConfig)
+	route.RegisterHumaOperations(api)
 
 	// Get the OpenAPI spec
 	spec := api.OpenAPI()
@@ -123,10 +115,4 @@ func getTags(spec *huma.OpenAPI) []string {
 		tags = append(tags, tag)
 	}
 	return tags
-}
-
-func registerOpenAPIRoutes(c *route.RouteConfig) {
-	// This is a simplified version that only registers Huma operations
-	// without the Fiber handlers (since we're not running the server)
-	route.RegisterHumaOperations(c)
 }

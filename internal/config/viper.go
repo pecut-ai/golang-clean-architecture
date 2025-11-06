@@ -12,6 +12,8 @@ func NewViper() *viper.Viper {
 	config.SetConfigFile(".env")
 	config.SetConfigType("env")
 	config.AutomaticEnv()
+	config.SetDefault("APP_NAME", "Golang Clean Architecture")
+	config.SetDefault("WEB_PORT", "3001")
 
 	err := config.ReadInConfig()
 	if err != nil {
