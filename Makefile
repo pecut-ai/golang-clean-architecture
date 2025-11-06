@@ -40,13 +40,13 @@ migrate-up:
 	@echo "Running database migrations..."
 	docker run --rm -v $(PWD)/db/migrations:/migrations --network host migrate/migrate \
 		-path=/migrations/ \
-		-database "postgresql://postgres:123@localhost:5432/golang_clean_architecture?sslmode=disable" up
+		-database "postgresql://postgres:123@postgres:5432/golang_clean_architecture?sslmode=disable" up
 
 migrate-down:
 	@echo "Rolling back database migrations..."
 	docker run --rm -v $(PWD)/db/migrations:/migrations --network host migrate/migrate \
 		-path=/migrations/ \
-		-database "postgresql://postgres:123@localhost:5432/golang_clean_architecture?sslmode=disable" down
+		-database "postgresql://postgres:123@postgres:5432/golang_clean_architecture?sslmode=disable" down
 
 run-web:
 	@echo "Running WEB server..."
@@ -59,11 +59,14 @@ run-worker:
 run:
 	@echo "Starting containers and running application..."
 	@make docker-up
-	@echo "Waiting for containers to be ready..."
-	@sleep 5
-	@make migrate-up
+# 	@echo "Waiting for containers to be ready..."
+# 	@sleep 5
+# 	@make migrate-up
 # 	@echo "Starting API and Worker..."
 # 	@make -j2 run-web run-worker
+
+	@echo "Starting Docker containers..."
+	docker compose -f docker-compose.dev.yml up
 
 clean:
 	@echo "Cleaning up..."
