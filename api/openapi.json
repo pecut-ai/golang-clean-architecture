@@ -613,9 +613,9 @@
       }
     },
     "securitySchemes": {
-      "basic": {
-        "description": "Basic authentication",
-        "scheme": "basic",
+      "bearer": {
+        "description": "Bearer token authentication",
+        "scheme": "bearer",
         "type": "http"
       }
     }
