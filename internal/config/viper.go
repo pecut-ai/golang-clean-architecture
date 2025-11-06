@@ -17,7 +17,10 @@ func NewViper() *viper.Viper {
 
 	err := config.ReadInConfig()
 	if err != nil {
-		panic(fmt.Errorf("Fatal error config file: %w \n", err))
+		// Don't panic if .env file doesn't exist, just use defaults and env vars
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			panic(fmt.Errorf("Fatal error config file: %w \n", err))
+		}
 	}
 
 	return config
