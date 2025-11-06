@@ -31,6 +31,13 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          APP_NAME=Golang Clean Architecture
+          WEB_PORT=3001
+          EOF
+
       - name: Generate OpenAPI spec
         run: go run cmd/open-api/main.go
 
