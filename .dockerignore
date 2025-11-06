@@ -1,0 +1,54 @@
+# Git
+.git/
+.github/
+.gitignore
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+test/
+*_test.go
+*.test
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation
+README.md
+LICENSE.txt
+*.md
+architecture.excalidraw
+architecture.png
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker files (no need to copy these into the image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+
+# Misc
+Makefile
+*.log
+tmp/
+temp/

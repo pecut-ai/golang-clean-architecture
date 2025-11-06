@@ -1,0 +1,15 @@
+# Use an official Go image.
+# Using a specific version is good practice.
+FROM golang:1.25-alpine
+
+# Set the Current Working Directory inside the container
+WORKDIR /app
+
+RUN go install github.com/air-verse/air@latest
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+EXPOSE 3001
+
+CMD ["air", "-c", ".air.toml"]
