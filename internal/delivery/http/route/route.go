@@ -11,7 +11,6 @@ import (
 
 type RouteConfig struct {
 	App               *fiber.App
-	Api               huma.API
 	UserController    *http.UserController
 	ContactController *http.ContactController
 	AddressController *http.AddressController
@@ -63,6 +62,10 @@ func (c *RouteConfig) SetupAuthRoute() {
 	}
 }
 
+func (c *RouteConfig) SetupDocs(api huma.API) {
+	RegisterHumaOperations(api)
+}
+
 func RegisterHumaOperations(api huma.API) {
 	registerGuestHumaOperations(api)
 	registerAuthHumaOperations(api)
@@ -84,6 +87,23 @@ func registerGuestHumaOperations(api huma.API) {
 	}, error) {
 		return nil, nil
 	})
+
+	// huma.Register(api, huma.Operation{
+	// 	OperationID: "find-user",
+	// 	Method:      "GET",
+	// 	Path:        "/api/users/{id}",
+	// 	Summary:     "Find a user",
+	// 	Description: "Find a user by id",
+	// 	Tags:        []string{"Users"},
+	// }, func(ctx context.Context, input *struct {
+	// 	Id string `path:"id" doc:"The Id of the user"`
+	// }) (*struct {
+	// 	Body struct {
+	// 		Name string `json:"name"`
+	// 	}
+	// }, error) {
+	// 	return nil, nil
+	// })
 
 	huma.Register(api, huma.Operation{
 		OperationID: "login-user",

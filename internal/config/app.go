@@ -7,6 +7,7 @@ import (
 	"golang-clean-architecture/internal/gateway/messaging"
 	"golang-clean-architecture/internal/repository"
 	"golang-clean-architecture/internal/usecase"
+	"os"
 
 	"github.com/IBM/sarama"
 	"github.com/danielgtaylor/huma/v2"
@@ -29,10 +30,13 @@ type BootstrapConfig struct {
 }
 
 func Bootstrap(config *BootstrapConfig) {
-	humaConfig := huma.DefaultConfig("Backend API", "1.0.0")
+	// Setup Huma API configuration
+	humaConfig := huma.DefaultConfig(config.Config.GetString("APP_NAME"), "1.0.0")
 	humaConfig.Servers = []*huma.Server{
 		{URL: "http://localhost:" + config.Config.GetString("WEB_PORT")},
 	}
+	humaConfig.DocsPath = "/docs"
+	humaConfig.OpenAPIPath = "/openapi.json"
 	// Add security scheme for bearer token
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 		"bearer": {
@@ -42,7 +46,6 @@ func Bootstrap(config *BootstrapConfig) {
 			Description:  "Bearer token authentication",
 		},
 	}
-	api := humafiber.New(config.App, humaConfig)
 
 	// setup repositories
 	userRepository := repository.NewUserRepository(config.Log)
@@ -75,11 +78,19 @@ func Bootstrap(config *BootstrapConfig) {
 
 	routeConfig := route.RouteConfig{
 		App:               config.App,
-		Api:               api,
 		UserController:    userController,
 		ContactController: contactController,
 		AddressController: addressController,
 		AuthMiddleware:    authMiddleware,
 	}
+	if !IsProduction() {
+		api := humafiber.New(config.App, humaConfig)
+		routeConfig.SetupDocs(api)
+	}
 	routeConfig.Setup()
+}
+
+func IsProduction() bool {
+	env, exists := os.LookupEnv("APP_ENV")
+	return exists && env == "production"
 }
