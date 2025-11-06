@@ -1,0 +1,66 @@
+name: Generate and Deploy RPC Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      fe_repo_name:
+        description: "FE Repo Name"
+        required: true
+      fe_repo_token:
+        description: "FE Repo Token"
+        required: true
+      generated_path:
+        description: "Path to placed"
+        required: true
+      file_name:
+        description: "File Name"
+        required: false
+        default: "openapi.json"
+
+jobs:
+  generate-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          APP_NAME=Golang Clean Architecture
+          WEB_PORT=3001
+          EOF
+
+      - name: Generate OpenAPI spec
+        run: go run cmd/open-api/main.go
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.fe_repo_name }}
+          token: ${{ github.event.inputs.fe_repo_token }}
+          path: target-repo
+
+      - name: Copy OpenAPI spec to target repo
+        run: |
+          mkdir -p target-repo/${{ github.event.inputs.generated_path }}
+          cp api/openapi.json target-repo/${{ github.event.inputs.generated_path }}/${{ github.event.inputs.file_name }}
+
+      - name: Commit and push to target repo
+        working-directory: target-repo
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ${{ github.event.inputs.generated_path }}/openapi.json
+          git commit -m "update: OpenAPI spec from ${{ github.repository }} [skip ci]"
+          git push
