@@ -2,56 +2,41 @@ package config
 
 import (
 	"fmt"
-	"time"
+	"net"
+	"net/url"
+	"strconv"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"golang-clean-architecture/internal/logging"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
-func NewDatabase(viper *viper.Viper, log *logrus.Logger) *gorm.DB {
-	username := viper.GetString("DB_USERNAME")
-	password := viper.GetString("DB_PASSWORD")
-	host := viper.GetString("DB_HOST")
-	port := viper.GetInt("DB_POST")
-	database := viper.GetString("DB_NAME")
-	idleConnection := viper.GetInt("DB_POOL_IDLE")
-	maxConnection := viper.GetInt("DB_POOL_MAX")
-	maxLifeTimeConnection := viper.GetInt("DB_POOL_LIFETIME")
+func OpenDatabase(cfg DatabaseConfig, log *logging.Logger) (*gorm.DB, error) {
+	dsnURL := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.Username, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.Name,
+	}
+	query := dsnURL.Query()
+	query.Set("sslmode", cfg.SSLMode)
+	dsnURL.RawQuery = query.Encode()
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", host, username, password, database, port)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.New(&logrusWriter{Logger: log}, logger.Config{
-			SlowThreshold:             time.Second * 5,
-			Colorful:                  false,
-			IgnoreRecordNotFoundError: true,
-			ParameterizedQueries:      true,
-			LogLevel:                  logger.Info,
-		}),
+	db, err := gorm.Open(postgres.Open(dsnURL.String()), &gorm.Config{
+		DisableAutomaticPing: true,
+		Logger:               NewGormLogger(log),
 	})
 	if err != nil {
-		log.Fatalf("failed to connect database: %v", err)
+		return nil, fmt.Errorf("open database handle: %w", err)
 	}
 
-	connection, err := db.DB()
+	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("failed to connect database: %v", err)
+		return nil, fmt.Errorf("get database connection pool: %w", err)
 	}
-
-	connection.SetMaxIdleConns(idleConnection)
-	connection.SetMaxOpenConns(maxConnection)
-	connection.SetConnMaxLifetime(time.Second * time.Duration(maxLifeTimeConnection))
-
-	return db
-}
-
-type logrusWriter struct {
-	Logger *logrus.Logger
-}
-
-func (l *logrusWriter) Printf(message string, args ...interface{}) {
-	l.Logger.Tracef(message, args...)
+	sqlDB.SetMaxIdleConns(cfg.PoolIdle)
+	sqlDB.SetMaxOpenConns(cfg.PoolMax)
+	sqlDB.SetConnMaxLifetime(cfg.PoolLifetime)
+	return db, nil
 }

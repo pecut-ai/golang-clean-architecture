@@ -1,156 +1,134 @@
-# Golang Clean Architecture Template
+# Go Clean Architecture Service Template
 
-## Description
+This repository is a production-oriented starting point for a Fiber + Huma service. It keeps the example contact/address domain small while demonstrating the runtime seams that every service needs: validated environment configuration, structured request-correlated logging, auth-service integration, OpenAPI-backed handlers, and deterministic startup/shutdown ownership.
 
-This is golang clean architecture template.
+## What is included
 
-## Architecture
+- Viper-backed `.env` and process-environment loading into typed configuration.
+- Startup validation with joined errors for invalid or missing settings.
+- Zap structured logging with contextual `request_id`, request metadata, user identity, and component names.
+- A GORM logger adapter using the same configured logger and request context.
+- Signal-driven graceful shutdown and panic recovery at process and HTTP boundaries.
+- Build metadata in `internal/buildinfo`; `APP_VERSION` is intentionally not used.
+- Auth-service v2 middleware and downstream request-ID propagation over gRPC.
+- CORS, trusted-proxy, request-ID, request logging, recovery, and auth middleware in an explicit order.
+- Real Huma handlers: runtime routing, validation, responses, and OpenAPI are defined once.
 
-![Clean Architecture](architecture.png)
+The current PostgreSQL handle is intentionally a transitional single-database seam. The next phase can replace `config.OpenDatabase` and the `bootstrap.Application.DB` field with the custom multi-DB manager without changing handler ownership or falling back to non-GORM queries.
 
-1. External system perform request (HTTP, gRPC, Messaging, etc)
-2. The Delivery creates various Model from request data
-3. The Delivery calls Use Case, and execute it using Model data
-4. The Use Case create Entity data for the business logic
-5. The Use Case calls Repository, and execute it using Entity data
-6. The Repository use Entity data to perform database operation
-7. The Repository perform database operation to the database
-8. The Use Case create various Model for Gateway or from Entity data
-9. The Use Case calls Gateway, and execute it using Model data
-10. The Gateway using Model data to construct request to external system
-11. The Gateway perform request to external system (HTTP, gRPC, Messaging, etc)
+## Runtime flow
 
-## Tech Stack
+```text
+cmd/web
+  -> config.Load (Viper + validation)
+  -> logging.New
+  -> bootstrap.NewApplication
+       -> Fiber and global middleware
+       -> GORM handle with component=gorm logger
+       -> optional Kafka producer
+       -> auth-service v2 client and middleware
+       -> Huma API and real example handlers
+  -> listen
+  -> signal or server failure
+  -> bounded graceful shutdown
+```
 
-- Golang : https://github.com/golang/go
-- Postgres (Database)
-- Apache Kafka : https://github.com/apache/kafka
+Middleware order matters. Request ID and request context run first, the access logger wraps the whole request, panic recovery wraps downstream work, CORS runs before route handling, and auth protects every `/api` route except `/api/health`. Authenticated user data is then added to the shared logging context before handlers run.
 
-## Framework & Library
-
-- GoFiber (HTTP Framework) : https://github.com/gofiber/fiber
-- GORM (ORM) : https://github.com/go-gorm/gorm
-- Viper (Configuration) : https://github.com/spf13/viper
-- Golang Migrate (Database Migration) : https://github.com/golang-migrate/migrate
-- Go Playground Validator (Validation) : https://github.com/go-playground/validator
-- Logrus (Logger) : https://github.com/sirupsen/logrus
-- Sarama (Kafka Client) : https://github.com/IBM/sarama
+Every HTTP response includes `X-Request-ID`. Every completed request emits one `http_request` event containing at least `request_id`, `component`, method, path, status, latency, and response size. Internal handlers, auth-service calls, and GORM queries reuse that context.
 
 ## Configuration
 
-All configuration is in `.env` file. Copy and modify as needed:
+Copy the annotated example and replace secrets:
 
 ```bash
-# Application
-APP_NAME=golang-clean-architecture
-WEB_PORT=3000
-WEB_PREFORK=false
-LOG_LEVEL=4
-
-# Database
-DB_USERNAME=postgres
-DB_PASSWORD=123
-DB_HOST=localhost
-DB_POST=5432
-DB_NAME=golang_clean_architecture
-DB_POOL_IDLE=10
-DB_POOL_MAX=100
-DB_POOL_LIFETIME=300
-
-# Kafka
-KAFKA_PRODUCER_ENABLED=false
-KAFKA_BOOTSTRAP_SERVER=localhost:9092
-KAFKA_GROUP_ID=golang-clean-arch-group
-KAFKA_AUTO_OFFSET_RESET=earliest
+cp .env.example .env
 ```
 
-## API Spec
+[`.env.example`](.env.example) documents every supported setting and its expected format. `APP_NAME`, `APP_ENV`, `APP_URL`, and `APP_PORT` are required and come from the environment. Process environment values override the dotenv file. Use `ENV_FILE=/path/to/file.env` to select another file.
 
-All API Spec is in `api` folder.
+Important validation rules:
 
-## Quick Start
+- `APP_ENV` is one of `development`, `test`, `staging`, or `production`.
+- `APP_URL` is an absolute URL and is advertised by OpenAPI.
+- ports must be between 1 and 65535; durations must be positive.
+- `ALLOW_CREDENTIALS=true` cannot be combined with `ALLOW_ORIGINS=*`.
+- auth target, service ID, and shared secret are required when auth is enabled.
+- database pool limits must satisfy `0 <= DB_POOL_IDLE <= DB_POOL_MAX`.
+- log level, format, outputs, and rotation values are validated before bootstrap.
 
-### Prerequisites
+The config loader creates a GORM/database pool without an eager network ping. This keeps process construction separate from dependency readiness; the first query or an explicit future readiness check establishes database connectivity.
 
-- Go 1.25+
-- Docker & Docker Compose
-- Make
+## Authentication
 
-### Setup and Run
+The service uses `github.com/pecut-ai/auth-service/pkg/v2`. Set:
+
+```dotenv
+AUTH_ENABLED=true
+AUTH_SERVICE_GRPC_TARGET=127.0.0.1:50051
+SERVICE_ID=golang-clean-architecture
+INTERNAL_SECRET=replace-me
+```
+
+Bearer tokens are verified by auth-service. The original local password/token implementation has been removed, so the template has one authentication authority. `GET /api/me` demonstrates reading the verified auth-service user context, and contacts are scoped directly by that external user ID.
+
+The public process health endpoint is `GET /api/health`. All other example `/api` endpoints require bearer authentication. Setting `AUTH_ENABLED=false` is only useful for OpenAPI generation or bootstrap diagnostics; protected routes return `503 Service Unavailable` in that mode.
+
+## API and OpenAPI
+
+Huma is the runtime handler layer, not a parallel documentation-only router. Transport request/response types live in `internal/delivery/http/dto`, while handlers in `internal/delivery/http/route` authenticate, map DTOs into application models, call use cases, and map results. Request DTOs use Huma-native schema tags such as `format`, `minLength`, `maxLength`, `minimum`, and `default`.
+
+With `DOCS_ENABLED=true`:
+
+- interactive docs: `${APP_URL}/docs`
+- OpenAPI JSON: `${APP_URL}/openapi.json`
+
+Regenerate the checked-in contract with:
 
 ```bash
-# Install dependencies
+make openapi
+```
+
+Example endpoints:
+
+- `GET /api/health`
+- `GET /api/me`
+- `GET|POST /api/contacts`
+- `GET|PUT|DELETE /api/contacts/{contactId}`
+- `GET|POST /api/contacts/{contactId}/addresses`
+- `GET|PUT|DELETE /api/contacts/{contactId}/addresses/{addressId}`
+
+## Logging
+
+Logs are emitted through Zap. Production should use `LOG_FORMAT=json`; `console` is useful locally. `LOG_OUTPUT` may contain `stdout`, `stderr`, `file`, or a comma-separated combination. File output uses size/age/count rotation from the corresponding `LOG_ROTATION_*` settings.
+
+Stable component examples are `api`, `gorm`, `repository`, `usecase`, `kafka_producer`, `kafka_consumer`, and `worker`. Auth-service log callbacks are bridged into the same logger as structured key/value fields.
+
+Do not log bearer tokens, refresh tokens, passwords, or `INTERNAL_SECRET`.
+
+## Build information
+
+`internal/buildinfo` contains `Version`, `Commit`, and `BuildTime`, defaulting to development values. Release builds should stamp them with `-ldflags`; `make build VERSION=v1.2.3` does this automatically. The version appears in startup identity, Huma/OpenAPI metadata, and `/api/health`.
+
+## Development
+
+Requirements: Go 1.25.6+, PostgreSQL, the `migrate` CLI for migration commands, and an accessible auth-service instance. Kafka is only needed for producer or worker flows.
+
+```bash
 make install
-
-# Start everything (containers + migrations + app)
-make run
-```
-
-This will:
-
-1. Start Docker containers (Postgres & Kafka)
-2. Run database migrations
-3. Start both web server and worker
-
-### Available Make Commands
-
-```bash
-make help              # Show all available commands
-make install           # Install Go dependencies
-make build             # Build binaries
-make docker-up         # Start Docker containers
-make docker-down       # Stop Docker containers
-make docker-restart    # Restart Docker containers
-make migrate-up        # Run database migrations
-make migrate-down      # Rollback database migrations
-make run-web           # Run web server only
-make run-worker        # Run worker only
-make run               # Start containers, migrate, and run everything
-make clean             # Clean build artifacts and stop containers
-```
-
-## Database Migration
-
-All database migration files are in `db/migrations` folder.
-
-### Create Migration
-
-```bash
-migrate create -ext sql -dir db/migrations create_table_xxx
-```
-
-### Manual Migration
-
-```bash
-# Up
-make migrate-up
-
-# Down
-make migrate-down
-```
-
-## Run Application
-
-### Run unit test
-
-```bash
-go test -v ./test/
-```
-
-### Run web server only
-
-```bash
+make test
 make run-web
 ```
 
-### Run worker only
+Useful commands:
 
 ```bash
+make build
+make openapi
+make migrate-up
+make migrate-down
 make run-worker
+make clean
 ```
 
-### Run everything
-
-```bash
-make run
-```
+Focused tests intentionally avoid external services. Database/auth integration tests should be added beside the future multi-DB manager using explicit test infrastructure rather than package-level `init()` side effects.

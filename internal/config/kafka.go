@@ -1,50 +1,38 @@
 package config
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/IBM/sarama"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
-func NewKafkaConsumerGroup(config *viper.Viper, log *logrus.Logger) sarama.ConsumerGroup {
-	saramaConfig := sarama.NewConfig()
-	saramaConfig.Consumer.Return.Errors = true
-
-	offsetReset := config.GetString("KAFKA_AUTO_OFFSET_RESET")
-	if offsetReset == "earliest" {
-		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
-	} else {
-		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
-	}
-
-	brokers := strings.Split(config.GetString("KAFKA_BOOTSTRAP_SERVER"), ",")
-	groupID := config.GetString("KAFKA_GROUP_ID")
-
-	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, saramaConfig)
-	if err != nil {
-		log.Fatalf("Failed to create consumer group: %v", err)
-	}
-	return consumerGroup
-}
-
-func NewKafkaProducer(config *viper.Viper, log *logrus.Logger) sarama.SyncProducer {
-	if !config.GetBool("KAFKA_PRODUCER_ENABLED") {
-		log.Info("Kafka producer is disabled")
-		return nil
+func OpenKafkaProducer(cfg KafkaConfig) (sarama.SyncProducer, error) {
+	if !cfg.Enabled {
+		return nil, nil
 	}
 
 	saramaConfig := sarama.NewConfig()
 	saramaConfig.Producer.Return.Successes = true
 	saramaConfig.Producer.RequiredAcks = sarama.WaitForAll
 	saramaConfig.Producer.Retry.Max = 3
-
-	brokers := strings.Split(config.GetString("KAFKA_BOOTSTRAP_SERVER"), ",")
-
-	producer, err := sarama.NewSyncProducer(brokers, saramaConfig)
+	producer, err := sarama.NewSyncProducer(cfg.BootstrapServers, saramaConfig)
 	if err != nil {
-		log.Fatalf("Failed to create producer: %v", err)
+		return nil, fmt.Errorf("open Kafka producer: %w", err)
 	}
-	return producer
+	return producer, nil
+}
+
+func OpenKafkaConsumerGroup(cfg KafkaConfig) (sarama.ConsumerGroup, error) {
+	saramaConfig := sarama.NewConfig()
+	saramaConfig.Consumer.Return.Errors = true
+	if cfg.AutoOffsetReset == "earliest" {
+		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
+	} else {
+		saramaConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
+	}
+	consumer, err := sarama.NewConsumerGroup(cfg.BootstrapServers, cfg.GroupID, saramaConfig)
+	if err != nil {
+		return nil, fmt.Errorf("open Kafka consumer group: %w", err)
+	}
+	return consumer, nil
 }

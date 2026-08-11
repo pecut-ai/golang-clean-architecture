@@ -1,18 +1,26 @@
-.PHONY: help install build migrate-up migrate-down docker-up docker-down docker-restart run-api run-worker run clean
+-include .env
+export
+
+VERSION ?= dev
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -X golang-clean-architecture/internal/buildinfo.Version=$(VERSION) -X golang-clean-architecture/internal/buildinfo.Commit=$(COMMIT) -X golang-clean-architecture/internal/buildinfo.BuildTime=$(BUILD_TIME)
+DATABASE_URL ?= postgresql://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
+
+.PHONY: help install build openapi test migrate-up migrate-down run-web run-worker run clean
 
 help:
 	@echo "Available commands:"
 	@echo "  make install        - Install Go dependencies"
 	@echo "  make build          - Build API and Worker binaries"
-	@echo "  make docker-up      - Start Docker containers"
-	@echo "  make docker-down    - Stop Docker containers"
-	@echo "  make docker-restart - Restart Docker containers"
+	@echo "  make openapi        - Regenerate api/openapi.json"
+	@echo "  make test           - Run focused package tests"
 	@echo "  make migrate-up     - Run database migrations"
 	@echo "  make migrate-down   - Rollback database migrations"
 	@echo "  make run-web        - Run WEB server"
 	@echo "  make run-worker     - Run Worker"
-	@echo "  make run            - Start containers, migrate, and run WEB + Worker"
-	@echo "  make clean          - Clean build artifacts and stop containers"
+	@echo "  make run            - Run the web server"
+	@echo "  make clean          - Clean build artifacts"
 
 install:
 	@echo "Installing dependencies..."
@@ -21,32 +29,22 @@ install:
 
 build:
 	@echo "Building binaries..."
-	go build -o bin/web cmd/web/main.go
-	go build -o bin/worker cmd/worker/main.go
+	go build -ldflags "$(LDFLAGS)" -o bin/web ./cmd/web
+	go build -ldflags "$(LDFLAGS)" -o bin/worker ./cmd/worker
 
-docker-up:
-	@echo "Starting Docker containers..."
-	docker compose -f docker-compose.dev.yml up -d
+openapi:
+	go run ./cmd/open-api api/openapi.json
 
-docker-down:
-	@echo "Stopping Docker containers..."
-	docker compose -f docker-compose.dev.yml down
-
-docker-restart:
-	@echo "Restarting Docker containers..."
-	docker compose -f docker-compose.dev.yml restart
+test:
+	go test -p=1 ./internal/config ./internal/logging ./internal/middleware ./internal/delivery/http/route ./internal/bootstrap
 
 migrate-up:
 	@echo "Running database migrations..."
-	docker run --rm -v $(PWD)/db/migrations:/migrations --network host migrate/migrate \
-		-path=/migrations/ \
-		-database "postgresql://postgres:123@postgres:5432/golang_clean_architecture?sslmode=disable" up
+	migrate -path db/migrations -database "$(DATABASE_URL)" up
 
 migrate-down:
 	@echo "Rolling back database migrations..."
-	docker run --rm -v $(PWD)/db/migrations:/migrations --network host migrate/migrate \
-		-path=/migrations/ \
-		-database "postgresql://postgres:123@postgres:5432/golang_clean_architecture?sslmode=disable" down
+	migrate -path db/migrations -database "$(DATABASE_URL)" down
 
 run-web:
 	@echo "Running WEB server..."
@@ -57,18 +55,8 @@ run-worker:
 	go run cmd/worker/main.go
 
 run:
-	@echo "Starting containers and running application..."
-	@make docker-up
-# 	@echo "Waiting for containers to be ready..."
-# 	@sleep 5
-# 	@make migrate-up
-# 	@echo "Starting API and Worker..."
-# 	@make -j2 run-web run-worker
-
-	@echo "Starting Docker containers..."
-	docker compose -f docker-compose.dev.yml up
+	@$(MAKE) run-web
 
 clean:
 	@echo "Cleaning up..."
-	rm -rf bin/
-	docker compose -f docker-compose.dev.yml down -v
+	rm -rf ./bin

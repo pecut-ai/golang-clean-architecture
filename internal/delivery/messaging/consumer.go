@@ -2,16 +2,16 @@ package messaging
 
 import (
 	"context"
+	"golang-clean-architecture/internal/logging"
 
 	"github.com/IBM/sarama"
-	"github.com/sirupsen/logrus"
 )
 
 type ConsumerHandler func(message *sarama.ConsumerMessage) error
 
 type ConsumerGroupHandler struct {
 	Handler ConsumerHandler
-	Log     *logrus.Logger
+	Log     *logging.Logger
 }
 
 func (h *ConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
@@ -43,7 +43,7 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 	}
 }
 
-func ConsumeTopic(ctx context.Context, consumerGroup sarama.ConsumerGroup, topic string, log *logrus.Logger, handler ConsumerHandler) {
+func ConsumeTopic(ctx context.Context, consumerGroup sarama.ConsumerGroup, topic string, log *logging.Logger, handler ConsumerHandler) {
 	consumerHandler := &ConsumerGroupHandler{
 		Handler: handler,
 		Log:     log,

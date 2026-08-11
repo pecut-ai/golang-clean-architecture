@@ -4,6 +4,7 @@ import (
 	"context"
 	"golang-clean-architecture/internal/entity"
 	"golang-clean-architecture/internal/gateway/messaging"
+	"golang-clean-architecture/internal/logging"
 	"golang-clean-architecture/internal/model"
 	"golang-clean-architecture/internal/model/converter"
 	"golang-clean-architecture/internal/repository"
@@ -11,19 +12,18 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 type ContactUseCase struct {
 	DB                *gorm.DB
-	Log               *logrus.Logger
+	Log               *logging.Logger
 	Validate          *validator.Validate
 	ContactRepository *repository.ContactRepository
 	ContactProducer   *messaging.ContactProducer
 }
 
-func NewContactUseCase(db *gorm.DB, logger *logrus.Logger, validate *validator.Validate,
+func NewContactUseCase(db *gorm.DB, logger *logging.Logger, validate *validator.Validate,
 	contactRepository *repository.ContactRepository, contactProducer *messaging.ContactProducer) *ContactUseCase {
 	return &ContactUseCase{
 		DB:                db,
@@ -35,6 +35,7 @@ func NewContactUseCase(db *gorm.DB, logger *logrus.Logger, validate *validator.V
 }
 
 func (c *ContactUseCase) Create(ctx context.Context, request *model.CreateContactRequest) (*model.ContactResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -64,7 +65,7 @@ func (c *ContactUseCase) Create(ctx context.Context, request *model.CreateContac
 
 	if c.ContactProducer != nil {
 		event := converter.ContactToEvent(contact)
-		if err := c.ContactProducer.Send(event); err != nil {
+		if err := c.ContactProducer.Send(ctx, event); err != nil {
 			c.Log.WithError(err).Error("error publishing contact created event")
 			return nil, fiber.ErrInternalServerError
 		}
@@ -77,6 +78,7 @@ func (c *ContactUseCase) Create(ctx context.Context, request *model.CreateContac
 }
 
 func (c *ContactUseCase) Update(ctx context.Context, request *model.UpdateContactRequest) (*model.ContactResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -108,7 +110,7 @@ func (c *ContactUseCase) Update(ctx context.Context, request *model.UpdateContac
 
 	if c.ContactProducer != nil {
 		event := converter.ContactToEvent(contact)
-		if err := c.ContactProducer.Send(event); err != nil {
+		if err := c.ContactProducer.Send(ctx, event); err != nil {
 			c.Log.WithError(err).Error("error publishing contact updated event")
 			return nil, fiber.ErrInternalServerError
 		}
@@ -121,6 +123,7 @@ func (c *ContactUseCase) Update(ctx context.Context, request *model.UpdateContac
 }
 
 func (c *ContactUseCase) Get(ctx context.Context, request *model.GetContactRequest) (*model.ContactResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -144,6 +147,7 @@ func (c *ContactUseCase) Get(ctx context.Context, request *model.GetContactReque
 }
 
 func (c *ContactUseCase) Delete(ctx context.Context, request *model.DeleteContactRequest) error {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -172,6 +176,7 @@ func (c *ContactUseCase) Delete(ctx context.Context, request *model.DeleteContac
 }
 
 func (c *ContactUseCase) Search(ctx context.Context, request *model.SearchContactRequest) ([]model.ContactResponse, int64, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -197,4 +202,10 @@ func (c *ContactUseCase) Search(ctx context.Context, request *model.SearchContac
 	}
 
 	return responses, total, nil
+}
+
+func (c *ContactUseCase) withContext(ctx context.Context) *ContactUseCase {
+	next := *c
+	next.Log = c.Log.FromContext(ctx)
+	return &next
 }

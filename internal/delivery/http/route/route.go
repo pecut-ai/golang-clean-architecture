@@ -2,335 +2,213 @@ package route
 
 import (
 	"context"
-	"golang-clean-architecture/internal/delivery/http"
+	"errors"
+	"math"
+
+	"golang-clean-architecture/internal/buildinfo"
+	"golang-clean-architecture/internal/delivery/http/dto"
 	"golang-clean-architecture/internal/model"
+	"golang-clean-architecture/internal/usecase"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/gofiber/fiber/v2"
+	authservice "github.com/pecut-ai/auth-service/pkg/v2/auth"
 )
 
-type RouteConfig struct {
-	App               *fiber.App
-	UserController    *http.UserController
-	ContactController *http.ContactController
-	AddressController *http.AddressController
-	AuthMiddleware    fiber.Handler
+type Dependencies struct {
+	Contact *usecase.ContactUseCase
+	Address *usecase.AddressUseCase
 }
 
-func (c *RouteConfig) Setup() {
-	c.SetupGuestRoute()
-	c.SetupAuthRoute()
+type Handler struct{ deps Dependencies }
+
+func Register(api huma.API, deps Dependencies) {
+	h := &Handler{deps: deps}
+	h.registerHealth(api)
+	h.registerCurrentUser(api)
+	h.registerContacts(api)
+	h.registerAddresses(api)
 }
 
-func (c *RouteConfig) SetupGuestRoute() {
-	// Fiber routing
-	if c.UserController != nil {
-		c.App.Post("/api/users", c.UserController.Register)
-		c.App.Post("/api/users/_login", c.UserController.Login)
+func (h *Handler) registerHealth(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-health",
+		Method:      fiber.MethodGet,
+		Path:        "/api/health",
+		Summary:     "Check process health",
+		Tags:        []string{"System"},
+	}, func(context.Context, *struct{}) (*dto.HealthOutput, error) {
+		return &dto.HealthOutput{Body: dto.HealthResponse{Status: "ok", Version: buildinfo.Version}}, nil
+	})
+}
+
+func (h *Handler) registerCurrentUser(api huma.API) {
+	huma.Register(api, securedOperation("get-current-user", fiber.MethodGet, "/api/me", "Get authenticated user context", "Authentication"), h.getCurrentUser)
+}
+
+func (h *Handler) registerContacts(api huma.API) {
+	huma.Register(api, securedOperation("list-contacts", fiber.MethodGet, "/api/contacts", "List contacts", "Contacts"), h.listContacts)
+	huma.Register(api, securedOperation("create-contact", fiber.MethodPost, "/api/contacts", "Create a contact", "Contacts"), h.createContact)
+	huma.Register(api, securedOperation("update-contact", fiber.MethodPut, "/api/contacts/{contactId}", "Update a contact", "Contacts"), h.updateContact)
+	huma.Register(api, securedOperation("get-contact", fiber.MethodGet, "/api/contacts/{contactId}", "Get a contact", "Contacts"), h.getContact)
+	huma.Register(api, securedOperation("delete-contact", fiber.MethodDelete, "/api/contacts/{contactId}", "Delete a contact", "Contacts"), h.deleteContact)
+}
+
+func (h *Handler) registerAddresses(api huma.API) {
+	huma.Register(api, securedOperation("list-addresses", fiber.MethodGet, "/api/contacts/{contactId}/addresses", "List contact addresses", "Addresses"), h.listAddresses)
+	huma.Register(api, securedOperation("create-address", fiber.MethodPost, "/api/contacts/{contactId}/addresses", "Create a contact address", "Addresses"), h.createAddress)
+	huma.Register(api, securedOperation("update-address", fiber.MethodPut, "/api/contacts/{contactId}/addresses/{addressId}", "Update a contact address", "Addresses"), h.updateAddress)
+	huma.Register(api, securedOperation("get-address", fiber.MethodGet, "/api/contacts/{contactId}/addresses/{addressId}", "Get a contact address", "Addresses"), h.getAddress)
+	huma.Register(api, securedOperation("delete-address", fiber.MethodDelete, "/api/contacts/{contactId}/addresses/{addressId}", "Delete a contact address", "Addresses"), h.deleteAddress)
+}
+
+func securedOperation(id, method, path, summary, tag string) huma.Operation {
+	return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary, Tags: []string{tag}, Security: []map[string][]string{{"bearerAuth": {}}}}
+}
+
+func (h *Handler) getCurrentUser(ctx context.Context, _ *struct{}) (*dto.CurrentUserOutput, error) {
+	user, ok := authservice.GetAuthUser(ctx)
+	if !ok || user == nil || user.UserID == "" {
+		return nil, huma.Error401Unauthorized("authenticated user is missing from request context")
 	}
+	return &dto.CurrentUserOutput{Body: dto.Envelope[dto.CurrentUserResponse]{Data: dto.CurrentUserResponse{
+		ID: user.UserID, Username: user.Username, RoleID: user.RoleID, RoleName: user.RoleName, SessionID: user.SessionID, Permissions: user.Permissions,
+	}}}, nil
 }
 
-func (c *RouteConfig) SetupAuthRoute() {
-	// Fiber routing with authentication middleware
-	if c.AuthMiddleware != nil {
-		c.App.Use(c.AuthMiddleware)
+func (h *Handler) listContacts(ctx context.Context, input *dto.ListContactsInput) (*dto.ContactsOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	// User routes
-	if c.UserController != nil {
-		c.App.Delete("/api/users", c.UserController.Logout)
-		c.App.Patch("/api/users/_current", c.UserController.Update)
-		c.App.Get("/api/users/_current", c.UserController.Current)
+	contacts, total, err := h.deps.Contact.Search(ctx, input.Request(userID))
+	if err != nil {
+		return nil, httpError(err)
 	}
+	return &dto.ContactsOutput{Body: dto.Envelope[[]model.ContactResponse]{
+		Data:   contacts,
+		Paging: &dto.PageMetadata{Page: input.Page, Size: input.Size, TotalItem: total, TotalPage: int64(math.Ceil(float64(total) / float64(input.Size)))},
+	}}, nil
+}
 
-	// Contact routes
-	if c.ContactController != nil {
-		c.App.Get("/api/contacts", c.ContactController.List)
-		c.App.Post("/api/contacts", c.ContactController.Create)
-		c.App.Put("/api/contacts/:contactId", c.ContactController.Update)
-		c.App.Get("/api/contacts/:contactId", c.ContactController.Get)
-		c.App.Delete("/api/contacts/:contactId", c.ContactController.Delete)
+func (h *Handler) createContact(ctx context.Context, input *dto.CreateContactInput) (*dto.ContactOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	// Address routes
-	if c.AddressController != nil {
-		c.App.Get("/api/contacts/:contactId/addresses", c.AddressController.List)
-		c.App.Post("/api/contacts/:contactId/addresses", c.AddressController.Create)
-		c.App.Put("/api/contacts/:contactId/addresses/:addressId", c.AddressController.Update)
-		c.App.Get("/api/contacts/:contactId/addresses/:addressId", c.AddressController.Get)
-		c.App.Delete("/api/contacts/:contactId/addresses/:addressId", c.AddressController.Delete)
+	contact, err := h.deps.Contact.Create(ctx, input.Request(userID))
+	if err != nil {
+		return nil, httpError(err)
 	}
+	return &dto.ContactOutput{Body: dto.Envelope[*model.ContactResponse]{Data: contact}}, nil
 }
 
-func (c *RouteConfig) SetupDocs(api huma.API) {
-	RegisterHumaOperations(api)
+func (h *Handler) updateContact(ctx context.Context, input *dto.UpdateContactInput) (*dto.ContactOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	contact, err := h.deps.Contact.Update(ctx, input.Request(userID))
+	if err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.ContactOutput{Body: dto.Envelope[*model.ContactResponse]{Data: contact}}, nil
 }
 
-func RegisterHumaOperations(api huma.API) {
-	registerGuestHumaOperations(api)
-	registerAuthHumaOperations(api)
+func (h *Handler) getContact(ctx context.Context, input *dto.ContactPathInput) (*dto.ContactOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	contact, err := h.deps.Contact.Get(ctx, input.GetRequest(userID))
+	if err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.ContactOutput{Body: dto.Envelope[*model.ContactResponse]{Data: contact}}, nil
 }
 
-// registerGuestHumaOperations registers Huma operations for public routes
-func registerGuestHumaOperations(api huma.API) {
-	huma.Register(api, huma.Operation{
-		OperationID: "register-user",
-		Method:      "POST",
-		Path:        "/api/users",
-		Summary:     "Register a new user",
-		Description: "Create a new user account with username and password",
-		Tags:        []string{"Users"},
-	}, func(ctx context.Context, input *struct {
-		Body model.RegisterUserRequest
-	}) (*struct {
-		Body model.WebResponse[*model.UserResponse]
-	}, error) {
-		return nil, nil
-	})
-
-	// huma.Register(api, huma.Operation{
-	// 	OperationID: "find-user",
-	// 	Method:      "GET",
-	// 	Path:        "/api/users/{id}",
-	// 	Summary:     "Find a user",
-	// 	Description: "Find a user by id",
-	// 	Tags:        []string{"Users"},
-	// }, func(ctx context.Context, input *struct {
-	// 	Id string `path:"id" doc:"The Id of the user"`
-	// }) (*struct {
-	// 	Body struct {
-	// 		Name string `json:"name"`
-	// 	}
-	// }, error) {
-	// 	return nil, nil
-	// })
-
-	huma.Register(api, huma.Operation{
-		OperationID: "login-user",
-		Method:      "POST",
-		Path:        "/api/users/_login",
-		Summary:     "Login user",
-		Description: "Authenticate user and receive a bearer token",
-		Tags:        []string{"Users"},
-	}, func(ctx context.Context, input *struct {
-		Body model.LoginUserRequest
-	}) (*struct {
-		Body model.WebResponse[*model.UserResponse]
-	}, error) {
-		return nil, nil
-	})
+func (h *Handler) deleteContact(ctx context.Context, input *dto.ContactPathInput) (*dto.BooleanOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.deps.Contact.Delete(ctx, input.DeleteRequest(userID)); err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.BooleanOutput{Body: dto.Envelope[bool]{Data: true}}, nil
 }
 
-// registerAuthHumaOperations registers Huma operations for authenticated routes
-func registerAuthHumaOperations(api huma.API) {
-	// User operations
-	huma.Register(api, huma.Operation{
-		OperationID: "logout-user",
-		Method:      "DELETE",
-		Path:        "/api/users",
-		Summary:     "Logout current user",
-		Description: "Invalidate the current user's authentication token",
-		Tags:        []string{"Users"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct{}) (*struct{ Body model.WebResponse[bool] }, error) {
-		return nil, nil
-	})
+func (h *Handler) listAddresses(ctx context.Context, input *dto.ContactPathInput) (*dto.AddressesOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	addresses, err := h.deps.Address.List(ctx, input.ListAddressesRequest(userID))
+	if err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.AddressesOutput{Body: dto.Envelope[[]model.AddressResponse]{Data: addresses}}, nil
+}
 
-	huma.Register(api, huma.Operation{
-		OperationID: "update-current-user",
-		Method:      "PATCH",
-		Path:        "/api/users/_current",
-		Summary:     "Update current user",
-		Description: "Update the authenticated user's profile information",
-		Tags:        []string{"Users"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		Body model.UpdateUserRequest
-	}) (*struct {
-		Body model.WebResponse[*model.UserResponse]
-	}, error) {
-		return nil, nil
-	})
+func (h *Handler) createAddress(ctx context.Context, input *dto.CreateAddressInput) (*dto.AddressOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	address, err := h.deps.Address.Create(ctx, input.Request(userID))
+	if err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.AddressOutput{Body: dto.Envelope[*model.AddressResponse]{Data: address}}, nil
+}
 
-	huma.Register(api, huma.Operation{
-		OperationID: "get-current-user",
-		Method:      "GET",
-		Path:        "/api/users/_current",
-		Summary:     "Get current user",
-		Description: "Retrieve the authenticated user's profile information",
-		Tags:        []string{"Users"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct{}) (*struct {
-		Body model.WebResponse[*model.UserResponse]
-	}, error) {
-		return nil, nil
-	})
+func (h *Handler) updateAddress(ctx context.Context, input *dto.UpdateAddressInput) (*dto.AddressOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	address, err := h.deps.Address.Update(ctx, input.Request(userID))
+	if err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.AddressOutput{Body: dto.Envelope[*model.AddressResponse]{Data: address}}, nil
+}
 
-	// Contact operations
-	huma.Register(api, huma.Operation{
-		OperationID: "list-contacts",
-		Method:      "GET",
-		Path:        "/api/contacts",
-		Summary:     "List contacts with search",
-		Description: "Search and filter contacts with pagination support",
-		Tags:        []string{"Contacts"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		Name  string `query:"name" doc:"Filter by name"`
-		Email string `query:"email" doc:"Filter by email"`
-		Phone string `query:"phone" doc:"Filter by phone"`
-		Page  int    `query:"page" doc:"Page number" default:"1"`
-		Size  int    `query:"size" doc:"Page size" default:"10"`
-	}) (*struct {
-		Body model.WebResponse[[]model.ContactResponse]
-	}, error) {
-		return nil, nil
-	})
+func (h *Handler) getAddress(ctx context.Context, input *dto.AddressPathInput) (*dto.AddressOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	address, err := h.deps.Address.Get(ctx, input.GetRequest(userID))
+	if err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.AddressOutput{Body: dto.Envelope[*model.AddressResponse]{Data: address}}, nil
+}
 
-	huma.Register(api, huma.Operation{
-		OperationID: "create-contact",
-		Method:      "POST",
-		Path:        "/api/contacts",
-		Summary:     "Create a new contact",
-		Description: "Add a new contact to the authenticated user's contact list",
-		Tags:        []string{"Contacts"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		Body model.CreateContactRequest
-	}) (*struct {
-		Body model.WebResponse[*model.ContactResponse]
-	}, error) {
-		return nil, nil
-	})
+func (h *Handler) deleteAddress(ctx context.Context, input *dto.AddressPathInput) (*dto.BooleanOutput, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.deps.Address.Delete(ctx, input.DeleteRequest(userID)); err != nil {
+		return nil, httpError(err)
+	}
+	return &dto.BooleanOutput{Body: dto.Envelope[bool]{Data: true}}, nil
+}
 
-	huma.Register(api, huma.Operation{
-		OperationID: "update-contact",
-		Method:      "PUT",
-		Path:        "/api/contacts/{contactId}",
-		Summary:     "Update a contact",
-		Description: "Update an existing contact's information",
-		Tags:        []string{"Contacts"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-		Body      model.UpdateContactRequest
-	}) (*struct {
-		Body model.WebResponse[*model.ContactResponse]
-	}, error) {
-		return nil, nil
-	})
+func authenticatedUserID(ctx context.Context) (string, error) {
+	user, ok := authservice.GetAuthUser(ctx)
+	if !ok || user == nil || user.UserID == "" {
+		return "", huma.Error401Unauthorized("authenticated user is missing from request context")
+	}
+	return user.UserID, nil
+}
 
-	huma.Register(api, huma.Operation{
-		OperationID: "get-contact",
-		Method:      "GET",
-		Path:        "/api/contacts/{contactId}",
-		Summary:     "Get a contact by ID",
-		Description: "Retrieve detailed information about a specific contact",
-		Tags:        []string{"Contacts"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-	}) (*struct {
-		Body model.WebResponse[*model.ContactResponse]
-	}, error) {
-		return nil, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "delete-contact",
-		Method:      "DELETE",
-		Path:        "/api/contacts/{contactId}",
-		Summary:     "Delete a contact",
-		Description: "Remove a contact from the authenticated user's contact list",
-		Tags:        []string{"Contacts"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-	}) (*struct{ Body model.WebResponse[bool] }, error) {
-		return nil, nil
-	})
-
-	// Address operations
-	huma.Register(api, huma.Operation{
-		OperationID: "list-addresses",
-		Method:      "GET",
-		Path:        "/api/contacts/{contactId}/addresses",
-		Summary:     "List addresses for a contact",
-		Description: "Retrieve all addresses associated with a specific contact",
-		Tags:        []string{"Addresses"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-	}) (*struct {
-		Body model.WebResponse[[]model.AddressResponse]
-	}, error) {
-		return nil, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "create-address",
-		Method:      "POST",
-		Path:        "/api/contacts/{contactId}/addresses",
-		Summary:     "Create a new address",
-		Description: "Add a new address to a contact",
-		Tags:        []string{"Addresses"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-		Body      model.CreateAddressRequest
-	}) (*struct {
-		Body model.WebResponse[*model.AddressResponse]
-	}, error) {
-		return nil, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "update-address",
-		Method:      "PUT",
-		Path:        "/api/contacts/{contactId}/addresses/{addressId}",
-		Summary:     "Update an address",
-		Description: "Update an existing address for a contact",
-		Tags:        []string{"Addresses"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-		AddressID string `path:"addressId" doc:"Address ID"`
-		Body      model.UpdateAddressRequest
-	}) (*struct {
-		Body model.WebResponse[*model.AddressResponse]
-	}, error) {
-		return nil, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "get-address",
-		Method:      "GET",
-		Path:        "/api/contacts/{contactId}/addresses/{addressId}",
-		Summary:     "Get an address by ID",
-		Description: "Retrieve detailed information about a specific address",
-		Tags:        []string{"Addresses"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-		AddressID string `path:"addressId" doc:"Address ID"`
-	}) (*struct {
-		Body model.WebResponse[*model.AddressResponse]
-	}, error) {
-		return nil, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "delete-address",
-		Method:      "DELETE",
-		Path:        "/api/contacts/{contactId}/addresses/{addressId}",
-		Summary:     "Delete an address",
-		Description: "Remove an address from a contact",
-		Tags:        []string{"Addresses"},
-		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, input *struct {
-		ContactID string `path:"contactId" doc:"Contact ID"`
-		AddressID string `path:"addressId" doc:"Address ID"`
-	}) (*struct{ Body model.WebResponse[bool] }, error) {
-		return nil, nil
-	})
+func httpError(err error) error {
+	var fiberErr *fiber.Error
+	if errors.As(err, &fiberErr) {
+		return huma.NewError(fiberErr.Code, fiberErr.Message)
+	}
+	return err
 }

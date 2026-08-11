@@ -1,6 +1,53 @@
 {
   "components": {
     "schemas": {
+      "AddressBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/AddressBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "city": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "country": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "postal_code": {
+            "maxLength": 10,
+            "minLength": 1,
+            "type": "string"
+          },
+          "province": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "street": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "street",
+          "city",
+          "province",
+          "postal_code",
+          "country"
+        ],
+        "type": "object"
+      },
       "AddressResponse": {
         "additionalProperties": false,
         "properties": {
@@ -40,6 +87,42 @@
           "country",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "ContactBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/ContactBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "first_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name"
         ],
         "type": "object"
       },
@@ -90,73 +173,196 @@
         ],
         "type": "object"
       },
-      "CreateAddressRequest": {
+      "CurrentUserResponse": {
         "additionalProperties": false,
         "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/CreateAddressRequest.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
+          "id": {
             "type": "string"
           },
-          "city": {
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "role_id": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "role_name": {
             "type": "string"
           },
-          "country": {
+          "session_id": {
             "type": "string"
           },
-          "postal_code": {
-            "type": "string"
-          },
-          "province": {
-            "type": "string"
-          },
-          "street": {
+          "username": {
             "type": "string"
           }
         },
         "required": [
-          "street",
-          "city",
-          "province",
-          "postal_code",
-          "country"
+          "id",
+          "username",
+          "session_id",
+          "permissions"
         ],
         "type": "object"
       },
-      "CreateContactRequest": {
+      "EnvelopeAddressResponse": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": [
-              "http://localhost:3001/schemas/CreateContactRequest.json"
+              "http://localhost:3000/schemas/EnvelopeAddressResponse.json"
             ],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
-          "email": {
-            "type": "string"
+          "data": {
+            "$ref": "#/components/schemas/AddressResponse"
           },
-          "first_name": {
-            "type": "string"
-          },
-          "last_name": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
           }
         },
         "required": [
-          "first_name",
-          "last_name",
-          "email",
-          "phone"
+          "data"
+        ],
+        "type": "object"
+      },
+      "EnvelopeBool": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/EnvelopeBool.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "data": {
+            "type": "boolean"
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "EnvelopeContactResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/EnvelopeContactResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ContactResponse"
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "EnvelopeCurrentUserResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/EnvelopeCurrentUserResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CurrentUserResponse"
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "EnvelopeListAddressResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/EnvelopeListAddressResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AddressResponse"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "EnvelopeListContactResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:3000/schemas/EnvelopeListContactResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ContactResponse"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "paging": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "data"
         ],
         "type": "object"
       },
@@ -183,7 +389,7 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": [
-              "http://localhost:3001/schemas/ErrorModel.json"
+              "http://localhost:3000/schemas/ErrorModel.json"
             ],
             "format": "uri",
             "readOnly": true,
@@ -241,28 +447,36 @@
         },
         "type": "object"
       },
-      "LoginUserRequest": {
+      "HealthResponse": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": [
-              "http://localhost:3001/schemas/LoginUserRequest.json"
+              "http://localhost:3000/schemas/HealthResponse.json"
             ],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
-          "id": {
+          "status": {
+            "description": "Process health status",
+            "examples": [
+              "ok"
+            ],
             "type": "string"
           },
-          "password": {
+          "version": {
+            "description": "Build version",
+            "examples": [
+              "dev"
+            ],
             "type": "string"
           }
         },
         "required": [
-          "id",
-          "password"
+          "status",
+          "version"
         ],
         "type": "object"
       },
@@ -293,351 +507,36 @@
           "total_page"
         ],
         "type": "object"
-      },
-      "RegisterUserRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/RegisterUserRequest.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "password",
-          "name"
-        ],
-        "type": "object"
-      },
-      "UpdateAddressRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/UpdateAddressRequest.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "city": {
-            "type": "string"
-          },
-          "country": {
-            "type": "string"
-          },
-          "postal_code": {
-            "type": "string"
-          },
-          "province": {
-            "type": "string"
-          },
-          "street": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "street",
-          "city",
-          "province",
-          "postal_code",
-          "country"
-        ],
-        "type": "object"
-      },
-      "UpdateContactRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/UpdateContactRequest.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "first_name": {
-            "type": "string"
-          },
-          "last_name": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "first_name",
-          "last_name",
-          "email",
-          "phone"
-        ],
-        "type": "object"
-      },
-      "UpdateUserRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/UpdateUserRequest.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "UserResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "created_at": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "token": {
-            "type": "string"
-          },
-          "updated_at": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "WebResponseAddressResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/WebResponseAddressResponse.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/AddressResponse"
-          },
-          "errors": {
-            "type": "string"
-          },
-          "paging": {
-            "$ref": "#/components/schemas/PageMetadata"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "WebResponseBool": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/WebResponseBool.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "data": {
-            "type": "boolean"
-          },
-          "errors": {
-            "type": "string"
-          },
-          "paging": {
-            "$ref": "#/components/schemas/PageMetadata"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "WebResponseContactResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/WebResponseContactResponse.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/ContactResponse"
-          },
-          "errors": {
-            "type": "string"
-          },
-          "paging": {
-            "$ref": "#/components/schemas/PageMetadata"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "WebResponseListAddressResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/WebResponseListAddressResponse.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/AddressResponse"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "errors": {
-            "type": "string"
-          },
-          "paging": {
-            "$ref": "#/components/schemas/PageMetadata"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "WebResponseListContactResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/WebResponseListContactResponse.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/ContactResponse"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "errors": {
-            "type": "string"
-          },
-          "paging": {
-            "$ref": "#/components/schemas/PageMetadata"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
-      },
-      "WebResponseUserResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "http://localhost:3001/schemas/WebResponseUserResponse.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/UserResponse"
-          },
-          "errors": {
-            "type": "string"
-          },
-          "paging": {
-            "$ref": "#/components/schemas/PageMetadata"
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "type": "object"
       }
     },
     "securitySchemes": {
-      "bearer": {
-        "description": "Bearer token authentication",
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "Access token issued by auth-service",
         "scheme": "bearer",
         "type": "http"
       }
     }
   },
   "info": {
-    "title": "Golang Clean Architecture",
-    "version": "1.0.0"
+    "description": "HTTP API for golang-clean-architecture. Authentication is delegated to auth-service.",
+    "title": "golang-clean-architecture API",
+    "version": "dev"
   },
   "openapi": "3.1.0",
   "paths": {
     "/api/contacts": {
       "get": {
-        "description": "Search and filter contacts with pagination support",
         "operationId": "list-contacts",
         "parameters": [
           {
-            "description": "Filter by name",
+            "description": "Filter by first or last name",
             "explode": false,
             "in": "query",
             "name": "name",
             "schema": {
-              "description": "Filter by name",
+              "description": "Filter by first or last name",
+              "maxLength": 100,
               "type": "string"
             }
           },
@@ -648,6 +547,7 @@
             "name": "email",
             "schema": {
               "description": "Filter by email",
+              "maxLength": 200,
               "type": "string"
             }
           },
@@ -658,30 +558,34 @@
             "name": "phone",
             "schema": {
               "description": "Filter by phone",
+              "maxLength": 20,
               "type": "string"
             }
           },
           {
-            "description": "Page number",
+            "description": "One-based page number",
             "explode": false,
             "in": "query",
             "name": "page",
             "schema": {
               "default": 1,
-              "description": "Page number",
+              "description": "One-based page number",
               "format": "int64",
+              "minimum": 1,
               "type": "integer"
             }
           },
           {
-            "description": "Page size",
+            "description": "Items per page",
             "explode": false,
             "in": "query",
             "name": "size",
             "schema": {
               "default": 10,
-              "description": "Page size",
+              "description": "Items per page",
               "format": "int64",
+              "maximum": 100,
+              "minimum": 1,
               "type": "integer"
             }
           }
@@ -691,7 +595,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseListContactResponse"
+                  "$ref": "#/components/schemas/EnvelopeListContactResponse"
                 }
               }
             },
@@ -710,22 +614,21 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "List contacts with search",
+        "summary": "List contacts",
         "tags": [
           "Contacts"
         ]
       },
       "post": {
-        "description": "Add a new contact to the authenticated user's contact list",
         "operationId": "create-contact",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateContactRequest"
+                "$ref": "#/components/schemas/ContactBody"
               }
             }
           },
@@ -736,7 +639,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseContactResponse"
+                  "$ref": "#/components/schemas/EnvelopeContactResponse"
                 }
               }
             },
@@ -755,10 +658,10 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Create a new contact",
+        "summary": "Create a contact",
         "tags": [
           "Contacts"
         ]
@@ -766,16 +669,16 @@
     },
     "/api/contacts/{contactId}": {
       "delete": {
-        "description": "Remove a contact from the authenticated user's contact list",
         "operationId": "delete-contact",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -785,7 +688,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseBool"
+                  "$ref": "#/components/schemas/EnvelopeBool"
                 }
               }
             },
@@ -804,7 +707,7 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
         "summary": "Delete a contact",
@@ -813,16 +716,16 @@
         ]
       },
       "get": {
-        "description": "Retrieve detailed information about a specific contact",
         "operationId": "get-contact",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -832,7 +735,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseContactResponse"
+                  "$ref": "#/components/schemas/EnvelopeContactResponse"
                 }
               }
             },
@@ -851,25 +754,25 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Get a contact by ID",
+        "summary": "Get a contact",
         "tags": [
           "Contacts"
         ]
       },
       "put": {
-        "description": "Update an existing contact's information",
         "operationId": "update-contact",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -878,7 +781,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateContactRequest"
+                "$ref": "#/components/schemas/ContactBody"
               }
             }
           },
@@ -889,7 +792,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseContactResponse"
+                  "$ref": "#/components/schemas/EnvelopeContactResponse"
                 }
               }
             },
@@ -908,7 +811,7 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
         "summary": "Update a contact",
@@ -919,16 +822,16 @@
     },
     "/api/contacts/{contactId}/addresses": {
       "get": {
-        "description": "Retrieve all addresses associated with a specific contact",
         "operationId": "list-addresses",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -938,7 +841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseListAddressResponse"
+                  "$ref": "#/components/schemas/EnvelopeListAddressResponse"
                 }
               }
             },
@@ -957,25 +860,25 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "List addresses for a contact",
+        "summary": "List contact addresses",
         "tags": [
           "Addresses"
         ]
       },
       "post": {
-        "description": "Add a new address to a contact",
         "operationId": "create-address",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -984,7 +887,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateAddressRequest"
+                "$ref": "#/components/schemas/AddressBody"
               }
             }
           },
@@ -995,7 +898,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseAddressResponse"
+                  "$ref": "#/components/schemas/EnvelopeAddressResponse"
                 }
               }
             },
@@ -1014,10 +917,10 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Create a new address",
+        "summary": "Create a contact address",
         "tags": [
           "Addresses"
         ]
@@ -1025,26 +928,27 @@
     },
     "/api/contacts/{contactId}/addresses/{addressId}": {
       "delete": {
-        "description": "Remove an address from a contact",
         "operationId": "delete-address",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           },
           {
-            "description": "Address ID",
+            "description": "Address UUID",
             "in": "path",
             "name": "addressId",
             "required": true,
             "schema": {
-              "description": "Address ID",
+              "description": "Address UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -1054,7 +958,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseBool"
+                  "$ref": "#/components/schemas/EnvelopeBool"
                 }
               }
             },
@@ -1073,35 +977,36 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Delete an address",
+        "summary": "Delete a contact address",
         "tags": [
           "Addresses"
         ]
       },
       "get": {
-        "description": "Retrieve detailed information about a specific address",
         "operationId": "get-address",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           },
           {
-            "description": "Address ID",
+            "description": "Address UUID",
             "in": "path",
             "name": "addressId",
             "required": true,
             "schema": {
-              "description": "Address ID",
+              "description": "Address UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -1111,7 +1016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseAddressResponse"
+                  "$ref": "#/components/schemas/EnvelopeAddressResponse"
                 }
               }
             },
@@ -1130,35 +1035,36 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Get an address by ID",
+        "summary": "Get a contact address",
         "tags": [
           "Addresses"
         ]
       },
       "put": {
-        "description": "Update an existing address for a contact",
         "operationId": "update-address",
         "parameters": [
           {
-            "description": "Contact ID",
+            "description": "Contact UUID",
             "in": "path",
             "name": "contactId",
             "required": true,
             "schema": {
-              "description": "Contact ID",
+              "description": "Contact UUID",
+              "format": "uuid",
               "type": "string"
             }
           },
           {
-            "description": "Address ID",
+            "description": "Address UUID",
             "in": "path",
             "name": "addressId",
             "required": true,
             "schema": {
-              "description": "Address ID",
+              "description": "Address UUID",
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -1167,7 +1073,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateAddressRequest"
+                "$ref": "#/components/schemas/AddressBody"
               }
             }
           },
@@ -1178,7 +1084,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseAddressResponse"
+                  "$ref": "#/components/schemas/EnvelopeAddressResponse"
                 }
               }
             },
@@ -1197,25 +1103,24 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Update an address",
+        "summary": "Update a contact address",
         "tags": [
           "Addresses"
         ]
       }
     },
-    "/api/users": {
-      "delete": {
-        "description": "Invalidate the current user's authentication token",
-        "operationId": "logout-user",
+    "/api/health": {
+      "get": {
+        "operationId": "get-health",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseBool"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             },
@@ -1232,67 +1137,21 @@
             "description": "Error"
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Logout current user",
+        "summary": "Check process health",
         "tags": [
-          "Users"
-        ]
-      },
-      "post": {
-        "description": "Create a new user account with username and password",
-        "operationId": "register-user",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterUserRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebResponseUserResponse"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Register a new user",
-        "tags": [
-          "Users"
+          "System"
         ]
       }
     },
-    "/api/users/_current": {
+    "/api/me": {
       "get": {
-        "description": "Retrieve the authenticated user's profile information",
         "operationId": "get-current-user",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebResponseUserResponse"
+                  "$ref": "#/components/schemas/EnvelopeCurrentUserResponse"
                 }
               }
             },
@@ -1311,107 +1170,20 @@
         },
         "security": [
           {
-            "bearer": []
+            "bearerAuth": []
           }
         ],
-        "summary": "Get current user",
+        "summary": "Get authenticated user context",
         "tags": [
-          "Users"
-        ]
-      },
-      "patch": {
-        "description": "Update the authenticated user's profile information",
-        "operationId": "update-current-user",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateUserRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebResponseUserResponse"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Update current user",
-        "tags": [
-          "Users"
-        ]
-      }
-    },
-    "/api/users/_login": {
-      "post": {
-        "description": "Authenticate user and receive a bearer token",
-        "operationId": "login-user",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginUserRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebResponseUserResponse"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Login user",
-        "tags": [
-          "Users"
+          "Authentication"
         ]
       }
     }
   },
   "servers": [
     {
-      "description": "Development server",
-      "url": "http://localhost:3001"
+      "description": "development",
+      "url": "http://localhost:3000"
     }
   ]
 }

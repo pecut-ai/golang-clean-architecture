@@ -2,55 +2,78 @@ package main
 
 import (
 	"context"
-	"golang-clean-architecture/internal/config"
-	"golang-clean-architecture/internal/delivery/messaging"
+	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
-	"time"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"golang-clean-architecture/internal/bootstrap"
+	"golang-clean-architecture/internal/buildinfo"
+	"golang-clean-architecture/internal/config"
+	"golang-clean-architecture/internal/delivery/messaging"
+	"golang-clean-architecture/internal/logging"
 )
 
 func main() {
-	viperConfig := config.NewViper()
-	logger := config.NewLogger(viperConfig)
-	logger.Info("Starting worker service")
+	var log *logging.Logger
+	defer bootstrap.RecoverMain("worker", &log)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+		os.Exit(1)
+	}
+	log, err = logging.New(cfg.Log)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "logger error: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = log.Sync() }()
+	log = log.With(
+		"service_name", cfg.App.Name,
+		"app_env", cfg.App.Env,
+		"app_version", buildinfo.Version,
+		"build_commit", buildinfo.Commit,
+		"build_time", buildinfo.BuildTime,
+	).Component("worker")
 
-	go RunUserConsumer(logger, viperConfig, ctx)
-	go RunContactConsumer(logger, viperConfig, ctx)
-	go RunAddressConsumer(logger, viperConfig, ctx)
+	ctx, cancelRuntime := context.WithCancel(context.Background())
+	defer cancelRuntime()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer signal.Stop(signals)
+	consumers := []struct {
+		topic string
+		new   func(*logging.Logger) messaging.ConsumerHandler
+	}{
+		{topic: "contacts", new: func(log *logging.Logger) messaging.ConsumerHandler { return messaging.NewContactConsumer(log).Consume }},
+		{topic: "addresses", new: func(log *logging.Logger) messaging.ConsumerHandler { return messaging.NewAddressConsumer(log).Consume }},
+	}
 
-	terminateSignals := make(chan os.Signal, 1)
-	signal.Notify(terminateSignals, syscall.SIGINT, syscall.SIGTERM)
-
-	s := <-terminateSignals
-	logger.Info("Got one of stop signals, shutting down worker gracefully, SIGNAL NAME :", s)
-	cancel()
-
-	time.Sleep(5 * time.Second) // wait for all consumers to finish processing
-}
-
-func RunAddressConsumer(logger *logrus.Logger, viperConfig *viper.Viper, ctx context.Context) {
-	logger.Info("setup address consumer")
-	addressConsumerGroup := config.NewKafkaConsumerGroup(viperConfig, logger)
-	addressHandler := messaging.NewAddressConsumer(logger)
-	messaging.ConsumeTopic(ctx, addressConsumerGroup, "addresses", logger, addressHandler.Consume)
-}
-
-func RunContactConsumer(logger *logrus.Logger, viperConfig *viper.Viper, ctx context.Context) {
-	logger.Info("setup contact consumer")
-	contactConsumerGroup := config.NewKafkaConsumerGroup(viperConfig, logger)
-	contactHandler := messaging.NewContactConsumer(logger)
-	messaging.ConsumeTopic(ctx, contactConsumerGroup, "contacts", logger, contactHandler.Consume)
-}
-
-func RunUserConsumer(logger *logrus.Logger, viperConfig *viper.Viper, ctx context.Context) {
-	logger.Info("setup user consumer")
-	userConsumerGroup := config.NewKafkaConsumerGroup(viperConfig, logger)
-	userHandler := messaging.NewUserConsumer(logger)
-	messaging.ConsumeTopic(ctx, userConsumerGroup, "users", logger, userHandler.Consume)
+	var wg sync.WaitGroup
+	var bootstrapErr error
+	for _, item := range consumers {
+		consumer, err := config.OpenKafkaConsumerGroup(cfg.Kafka)
+		if err != nil {
+			log.Errorw("worker_bootstrap_failed", "topic", item.topic, "error", err)
+			bootstrapErr = err
+			cancelRuntime()
+			break
+		}
+		topic, handler := item.topic, item.new(log.Component("kafka_consumer").With("topic", item.topic))
+		wg.Go(func() { messaging.ConsumeTopic(ctx, consumer, topic, log, handler) })
+	}
+	if bootstrapErr == nil {
+		received := <-signals
+		log.Infow("shutdown_signal_received", "signal", received.String())
+		cancelRuntime()
+	}
+	log.Infow("worker_shutdown_started")
+	wg.Wait()
+	log.Infow("worker_stopped")
+	if bootstrapErr != nil {
+		_ = log.Sync()
+		os.Exit(1)
+	}
 }

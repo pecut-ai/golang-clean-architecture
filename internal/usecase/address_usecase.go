@@ -4,6 +4,7 @@ import (
 	"context"
 	"golang-clean-architecture/internal/entity"
 	"golang-clean-architecture/internal/gateway/messaging"
+	"golang-clean-architecture/internal/logging"
 	"golang-clean-architecture/internal/model"
 	"golang-clean-architecture/internal/model/converter"
 	"golang-clean-architecture/internal/repository"
@@ -11,20 +12,19 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 type AddressUseCase struct {
 	DB                *gorm.DB
-	Log               *logrus.Logger
+	Log               *logging.Logger
 	Validate          *validator.Validate
 	AddressRepository *repository.AddressRepository
 	ContactRepository *repository.ContactRepository
 	AddressProducer   *messaging.AddressProducer
 }
 
-func NewAddressUseCase(db *gorm.DB, logger *logrus.Logger, validate *validator.Validate,
+func NewAddressUseCase(db *gorm.DB, logger *logging.Logger, validate *validator.Validate,
 	contactRepository *repository.ContactRepository, addressRepository *repository.AddressRepository,
 	addressProducer *messaging.AddressProducer) *AddressUseCase {
 	return &AddressUseCase{
@@ -38,6 +38,7 @@ func NewAddressUseCase(db *gorm.DB, logger *logrus.Logger, validate *validator.V
 }
 
 func (c *AddressUseCase) Create(ctx context.Context, request *model.CreateAddressRequest) (*model.AddressResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -74,7 +75,7 @@ func (c *AddressUseCase) Create(ctx context.Context, request *model.CreateAddres
 
 	if c.AddressProducer != nil {
 		event := converter.AddressToEvent(address)
-		if err := c.AddressProducer.Send(event); err != nil {
+		if err := c.AddressProducer.Send(ctx, event); err != nil {
 			c.Log.WithError(err).Error("failed to publish address created event")
 			return nil, fiber.ErrInternalServerError
 		}
@@ -87,6 +88,7 @@ func (c *AddressUseCase) Create(ctx context.Context, request *model.CreateAddres
 }
 
 func (c *AddressUseCase) Update(ctx context.Context, request *model.UpdateAddressRequest) (*model.AddressResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -125,7 +127,7 @@ func (c *AddressUseCase) Update(ctx context.Context, request *model.UpdateAddres
 
 	if c.AddressProducer != nil {
 		event := converter.AddressToEvent(address)
-		if err := c.AddressProducer.Send(event); err != nil {
+		if err := c.AddressProducer.Send(ctx, event); err != nil {
 			c.Log.WithError(err).Error("failed to publish address updated event")
 			return nil, fiber.ErrInternalServerError
 		}
@@ -138,6 +140,7 @@ func (c *AddressUseCase) Update(ctx context.Context, request *model.UpdateAddres
 }
 
 func (c *AddressUseCase) Get(ctx context.Context, request *model.GetAddressRequest) (*model.AddressResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -162,6 +165,7 @@ func (c *AddressUseCase) Get(ctx context.Context, request *model.GetAddressReque
 }
 
 func (c *AddressUseCase) Delete(ctx context.Context, request *model.DeleteAddressRequest) error {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -191,6 +195,7 @@ func (c *AddressUseCase) Delete(ctx context.Context, request *model.DeleteAddres
 }
 
 func (c *AddressUseCase) List(ctx context.Context, request *model.ListAddressRequest) ([]model.AddressResponse, error) {
+	c = c.withContext(ctx)
 	tx := c.DB.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -217,4 +222,10 @@ func (c *AddressUseCase) List(ctx context.Context, request *model.ListAddressReq
 	}
 
 	return responses, nil
+}
+
+func (c *AddressUseCase) withContext(ctx context.Context) *AddressUseCase {
+	next := *c
+	next.Log = c.Log.FromContext(ctx)
+	return &next
 }

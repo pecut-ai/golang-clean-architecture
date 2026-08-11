@@ -2,17 +2,16 @@ package repository
 
 import (
 	"golang-clean-architecture/internal/entity"
-
-	"github.com/sirupsen/logrus"
+	"golang-clean-architecture/internal/logging"
 	"gorm.io/gorm"
 )
 
 type AddressRepository struct {
 	Repository[entity.Address]
-	Log *logrus.Logger
+	Log *logging.Logger
 }
 
-func NewAddressRepository(log *logrus.Logger) *AddressRepository {
+func NewAddressRepository(log *logging.Logger) *AddressRepository {
 	return &AddressRepository{
 		Log: log,
 	}

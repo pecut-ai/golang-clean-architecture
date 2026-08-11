@@ -2,17 +2,17 @@ package messaging
 
 import (
 	"encoding/json"
+	"golang-clean-architecture/internal/logging"
 	"golang-clean-architecture/internal/model"
 
 	"github.com/IBM/sarama"
-	"github.com/sirupsen/logrus"
 )
 
 type AddressConsumer struct {
-	Log *logrus.Logger
+	Log *logging.Logger
 }
 
-func NewAddressConsumer(log *logrus.Logger) *AddressConsumer {
+func NewAddressConsumer(log *logging.Logger) *AddressConsumer {
 	return &AddressConsumer{
 		Log: log,
 	}

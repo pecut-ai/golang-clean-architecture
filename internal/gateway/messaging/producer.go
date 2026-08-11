@@ -1,27 +1,29 @@
 package messaging
 
 import (
+	"context"
 	"encoding/json"
+	"golang-clean-architecture/internal/logging"
 	"golang-clean-architecture/internal/model"
 
 	"github.com/IBM/sarama"
-	"github.com/sirupsen/logrus"
 )
 
 type Producer[T model.Event] struct {
 	Producer sarama.SyncProducer
 	Topic    string
-	Log      *logrus.Logger
+	Log      *logging.Logger
 }
 
 func (p *Producer[T]) GetTopic() *string {
 	return &p.Topic
 }
 
-func (p *Producer[T]) Send(event T) error {
+func (p *Producer[T]) Send(ctx context.Context, event T) error {
+	log := p.Log.FromContext(ctx)
 	value, err := json.Marshal(event)
 	if err != nil {
-		p.Log.WithError(err).Error("failed to marshal event")
+		log.WithError(err).Error("failed to marshal event")
 		return err
 	}
 
@@ -33,10 +35,10 @@ func (p *Producer[T]) Send(event T) error {
 
 	partition, offset, err := p.Producer.SendMessage(message)
 	if err != nil {
-		p.Log.WithError(err).Error("failed to produce message")
+		log.WithError(err).Error("failed to produce message")
 		return err
 	}
 
-	p.Log.Debugf("Message sent to topic %s, partition %d, offset %d", p.Topic, partition, offset)
+	log.Debugf("Message sent to topic %s, partition %d, offset %d", p.Topic, partition, offset)
 	return nil
 }

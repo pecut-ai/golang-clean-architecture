@@ -2,17 +2,17 @@ package messaging
 
 import (
 	"encoding/json"
+	"golang-clean-architecture/internal/logging"
 	"golang-clean-architecture/internal/model"
 
 	"github.com/IBM/sarama"
-	"github.com/sirupsen/logrus"
 )
 
 type ContactConsumer struct {
-	Log *logrus.Logger
+	Log *logging.Logger
 }
 
-func NewContactConsumer(log *logrus.Logger) *ContactConsumer {
+func NewContactConsumer(log *logging.Logger) *ContactConsumer {
 	return &ContactConsumer{
 		Log: log,
 	}
